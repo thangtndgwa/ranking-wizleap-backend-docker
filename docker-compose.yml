@@ -1,0 +1,99 @@
+services:
+    # nginx:
+    #     container_name: "ranking.nginx"
+    #     image: 'nginx:latest'
+    #     ports:
+    #         - '${HTTP_PORT:-8000}:80'
+    #         - '${SSL_PORT:-443}:443'
+    #     environment:
+    #         - SSL_PORT=${SSL_PORT:-443}
+    #         - APP_SERVICE=${APP_SERVICE:-laravel.test}
+    #         - SERVER_NAME=${SERVER_NAME:-localhost}
+    #     volumes:
+    #         - ./nginx/nginx.conf:/etc/nginx/nginx.conf:rw
+    #         - ./nginx/sites:/etc/nginx/sites-enabled:rw
+    #         - ./nginx/logs:/var/log/nginx:rw
+    #         - './sail-nginx:/etc/nginx/certs'
+    #         - './vendor/ryoluo/sail-ssl/nginx/templates:/etc/nginx/templates'
+    #         - './vendor/ryoluo/sail-ssl/nginx/generate-ssl-cert.sh:/docker-entrypoint.d/99-generate-ssl-cert.sh'
+    #         - '${WORD_DIR}:/var/www/html'
+    #     depends_on:
+    #         - ${APP_SERVICE:-laravel.test}
+    #     networks:
+    #         - sail
+
+    laravel.test:
+        container_name: "ranking.laravel"
+        build:
+            context: ./vendor/laravel/sail/runtimes/8.2
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '${WWWGROUP}'
+        image: sail-8.2/app
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+            # - 'host.docker.internal:172.19.0.1'
+        ports:
+            - '${APP_PORT:-80}:80'
+            - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+        volumes:
+            - '${WORD_DIR}/ranking-wizleap-backend:/var/www/html'
+            - './php/8.2/php.ini:/etc/php/8.2/cli/php.ini'
+        networks:
+            - sail
+        depends_on:
+            - mysql
+
+    mysql:
+        container_name: "ranking.mysql.8"
+        build:
+            context: .
+            dockerfile: .docker/mysql/Dockerfile
+        ports:
+            - '${FORWARD_DB_PORT:-3306}:3306'
+        environment:
+            MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_ROOT_HOST: "%"
+            MYSQL_DATABASE: '${DB_DATABASE}'
+            MYSQL_USER: '${DB_USERNAME}'
+            MYSQL_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_ALLOW_EMPTY_PASSWORD: 1
+        volumes:
+            - './sail-mysql:/var/lib/mysql:rw'
+            # - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+        networks:
+            - sail
+        healthcheck:
+            test: ["CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}"]
+            retries: 3
+            timeout: 5s
+
+    adminer:
+        container_name: "ranking.adminer"
+        image: adminer
+        restart: always
+        ports:
+        - "${ADMINER_PORT}:8080"
+        environment:
+            ADMINER_DEFAULT_DB_HOST: "mysql"
+            MARIADB_DEFAULT_USER: ${DB_USERNAME}
+            MARIADB_USER: ${DB_USERNAME}
+            MARIADB_DEFAULT_PASSWORD: ${DB_PASSWORD}
+            MARIADB_PASSWORD: ${DB_PASSWORD}
+        networks:
+            - sail
+
+networks:
+    sail:
+        driver: bridge
+volumes:
+    # sail-nginx:
+    #     driver: local
+    sail-mysql:
+        driver: local
+
